@@ -8,7 +8,7 @@ layout (binding = 0) readonly buffer A {block_stq1_0 data_a[];};
 layout (binding = 1) writeonly buffer D {D_TYPE data_b[];};
 
 void main() {
-    const uint ib = gl_WorkGroupID.x;
+    const uint ib = gl_WorkGroupID.x * 8 + gl_LocalInvocationID.x / 32;
 
     if (ib >= p.nel / 256) {
         return;
@@ -17,7 +17,7 @@ void main() {
     const float d = float(data_a[ib].d);
 
     // Each thread handles 2 groups (gg = g, g+1)
-    const uint tid = gl_LocalInvocationID.x;
+    const uint tid = gl_LocalInvocationID.x % 32;
     const uint g = tid * 2;
 
     for (int j = 0; j < 2; ++j) {
