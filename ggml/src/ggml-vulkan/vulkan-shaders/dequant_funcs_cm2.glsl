@@ -852,6 +852,52 @@ f16vec4 dequantFuncIQ1_M_v(const in decodeBufIQ1_M bl, const in uint blockCoords
 }
 #endif
 
+#if defined(DATA_A_STQ1_0)
+layout(buffer_reference, std430, buffer_reference_align = 2) buffer decodeBufSTQ1_0 {
+   block_stq1_0 block;
+};
+
+float16_t dequantFuncSTQ1_0(const in decodeBufSTQ1_0 bl, const in uint blockCoords[2], const in uint coordInBlock[2])
+{
+    const float16_t d = bl.block.d;
+    const uint idx = coordInBlock[1];
+
+    const uint rem = idx % 64;
+    const uint chunk = idx / 64;
+    const uint gloc = rem % 16;
+    const uint p = rem / 16;
+    const uint gg = chunk * 16 + gloc;
+
+    const uint code = uint((bl.block.qs[gg/2] >> (4 * (gg & 1))) & 0x0Fu);
+    const uint sgn = uint((bl.block.sign[gg/8] >> (gg % 8)) & 0x01u);
+    const uint qpack = stq1_0_codebook[(sgn << 4) | code];
+    const float16_t v = d * float16_t((int(qpack >> (2 * p)) & 3) - 1);
+    return v;
+}
+
+f16vec4 dequantFuncSTQ1_0_v(const in decodeBufSTQ1_0 bl, const in uint blockCoords[2], const in uint coordInBlock[2])
+{
+    const float16_t d = bl.block.d;
+    const uint idx = coordInBlock[1];
+    f16vec4 res;
+    for (int k = 0; k < 4; ++k) {
+        const uint pos = idx + k;
+        if (pos >= QUANT_K_STQ1_0) { res[k] = float16_t(0.0); continue; }
+        const uint rem = pos % 64;
+        const uint chunk = pos / 64;
+        const uint gloc = rem % 16;
+        const uint p = rem / 16;
+        const uint gg = chunk * 16 + gloc;
+
+        const uint code = uint((bl.block.qs[gg/2] >> (4 * (gg & 1))) & 0x0Fu);
+        const uint sgn = uint((bl.block.sign[gg/8] >> (gg % 8)) & 0x01u);
+        const uint qpack = stq1_0_codebook[(sgn << 4) | code];
+        res[k] = d * float16_t((int(qpack >> (2 * p)) & 3) - 1);
+    }
+    return res;
+}
+#endif
+
 #if defined(DATA_A_IQ2_XXS)
 layout(buffer_reference, std430, buffer_reference_align = 2) buffer decodeBufIQ2_XXS {
    block_iq2_xxs block;
@@ -1341,6 +1387,9 @@ f16vec4 dequantFuncNVFP4_v(const in decodeBufNVFP4 bl, const in uint blockCoords
 #elif defined(DATA_A_IQ1_S)
 #define dequantFuncA dequantFuncIQ1_S
 #define dequantFuncA_v dequantFuncIQ1_S_v
+#elif defined(DATA_A_STQ1_0)
+#define dequantFuncA dequantFuncSTQ1_0
+#define dequantFuncA_v dequantFuncSTQ1_0_v
 #elif defined(DATA_A_IQ1_M)
 #define dequantFuncA dequantFuncIQ1_M
 #define dequantFuncA_v dequantFuncIQ1_M_v

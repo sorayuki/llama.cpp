@@ -4,7 +4,7 @@
 
 #include "types.glsl"
 
-#if defined(DATA_A_Q4_0) || defined(DATA_A_Q5_0) || defined(DATA_A_Q8_0) || defined(DATA_A_IQ1_S) || defined(DATA_A_IQ2_XXS) || defined(DATA_A_IQ2_XS) || defined(DATA_A_IQ2_S) || defined(DATA_A_IQ3_XXS) || defined(DATA_A_IQ3_S) || defined(DATA_A_IQ4_XS) || defined(DATA_A_IQ4_NL)
+#if defined(DATA_A_Q4_0) || defined(DATA_A_Q5_0) || defined(DATA_A_Q8_0) || defined(DATA_A_IQ1_S) || defined(DATA_A_STQ1_0) || defined(DATA_A_IQ2_XXS) || defined(DATA_A_IQ2_XS) || defined(DATA_A_IQ2_S) || defined(DATA_A_IQ3_XXS) || defined(DATA_A_IQ3_S) || defined(DATA_A_IQ4_XS) || defined(DATA_A_IQ4_NL)
 FLOAT_TYPE get_dm(uint ib) {
     return FLOAT_TYPE(data_a[ib].d);
 }
@@ -523,5 +523,40 @@ FLOAT_TYPE mmvq_dot_product(const uint ib_a, const uint iqs) {
     sum *= float(cache_b_ds.x);
 
     return sum;
+}
+#endif
+
+#if defined(DATA_A_STQ1_0)
+int32_t stq1_0_pack_4(const uint ib, const uint g, const uint p) {
+    int32_t v = 0;
+    for (int i = 0; i < 4; ++i) {
+        const uint gg = g + i;
+        const uint code = uint((data_a[ib].qs[gg/2] >> (4 * (gg & 1))) & 0x0Fu);
+        const uint sgn = uint((data_a[ib].sign[gg/8] >> (gg % 8)) & 0x01u);
+        const uint qpack = stq1_0_codebook[(sgn << 4) | code];
+        const int32_t q = int32_t(int(qpack >> (2 * p)) & 3) - 1;
+        v |= (q & 0xFF) << (8 * i);
+    }
+    return v;
+}
+
+FLOAT_TYPE mmvq_dot_product(const uint ib_a, const uint iqs) {
+    const uint ib_k = ib_a / 8;
+    const uint pos0 = (ib_a % 8) * 32 + iqs * 32;
+
+    int32_t q_sum = 0;
+    const uint chunk = pos0 / 64;
+    const uint p0 = 2 * ((pos0 / 32) & 1);
+    const uint g0 = 16 * chunk;
+
+    for (int i = 0; i < 4; ++i) {
+        const uint g = g0 + 4 * i;
+        const int32_t v0 = stq1_0_pack_4(ib_k, g, p0);
+        const int32_t v1 = stq1_0_pack_4(ib_k, g, p0 + 1);
+        q_sum += dotPacked4x8EXT(v0, cache_b_qs[i]);
+        q_sum += dotPacked4x8EXT(v1, cache_b_qs[i + 4]);
+    }
+
+    return FLOAT_TYPE(float(cache_b_ds.x) * float(data_a[ib_k].d) * float(q_sum));
 }
 #endif

@@ -1,0 +1,39 @@
+#version 450
+
+#include "dequant_head.glsl"
+
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+layout (binding = 0) readonly buffer A {block_stq1_0 data_a[];};
+layout (binding = 1) writeonly buffer D {D_TYPE data_b[];};
+
+void main() {
+    const uint ib = gl_WorkGroupID.x;
+
+    if (ib >= p.nel / 256) {
+        return;
+    }
+
+    const float d = float(data_a[ib].d);
+
+    // Each thread handles 2 groups (gg = g, g+1)
+    const uint tid = gl_LocalInvocationID.x;
+    const uint g = tid * 2;
+
+    for (int j = 0; j < 2; ++j) {
+        const uint gg = g + j;
+        const uint chunk = gg / 16;
+        const uint gloc  = gg % 16;
+
+        const uint code = uint((data_a[ib].qs[gg/2] >> (4 * (gg & 1))) & 0x0F);
+        const uint sign = uint((data_a[ib].sign[gg/8] >> (gg % 8)) & 0x01);
+        const uint qpack = stq1_0_codebook[(sign << 4) | code];
+
+        const uint b_idx = 256 * ib + chunk * 64 + gloc;
+
+        data_b[b_idx + 0*16] = D_TYPE(d * float((int(qpack >> 0) & 3) - 1));
+        data_b[b_idx + 1*16] = D_TYPE(d * float((int(qpack >> 2) & 3) - 1));
+        data_b[b_idx + 2*16] = D_TYPE(d * float((int(qpack >> 4) & 3) - 1));
+        data_b[b_idx + 3*16] = D_TYPE(d * float((int(qpack >> 6) & 3) - 1));
+    }
+}

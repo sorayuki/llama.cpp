@@ -325,6 +325,30 @@ void load_a_to_shmem(const uint pos_a, const uint row, const uint col, const uin
                 buf_a[buf_idx + k] = FLOAT_TYPEV2(dl * (bitfieldExtract(grid, 4 * k    , 2) + delta),
                                                   dl * (bitfieldExtract(grid, 4 * k + 2, 2) + delta));
             }
+#elif defined(DATA_A_STQ1_0)
+            const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
+            const uint buf_idx = col * SHMEM_STRIDE + row * LOAD_VEC_A / 2;
+
+            const uint ib = idx / 32;                  // 8 values per idx
+            const uint pos0 = (idx % 32) * 8;
+            const uint chunk = pos0 / 64;
+            const uint gloc0 = pos0 % 16;
+            const uint p = (pos0 % 64) / 16;
+            const uint g0 = chunk * 16 + gloc0;
+
+            const float d = float(data_a[ib].d);
+
+            [[unroll]] for (int k = 0; k < 4; ++k) {
+                const uint g = g0 + 2 * k;
+                const uint code0 = uint((data_a[ib].qs[(g    )/2] >> (4 * ((g    ) & 1))) & 0x0Fu);
+                const uint sgn0  = uint((data_a[ib].sign[(g    )/8] >> ((g    ) % 8)) & 0x01u);
+                const uint code1 = uint((data_a[ib].qs[(g + 1)/2] >> (4 * ((g + 1) & 1))) & 0x0Fu);
+                const uint sgn1  = uint((data_a[ib].sign[(g + 1)/8] >> ((g + 1) % 8)) & 0x01u);
+                const uint qpack0 = stq1_0_codebook[(sgn0 << 4) | code0];
+                const uint qpack1 = stq1_0_codebook[(sgn1 << 4) | code1];
+                buf_a[buf_idx + k] = FLOAT_TYPEV2(d * float((int(qpack0 >> (2 * p)) & 3) - 1),
+                                                  d * float((int(qpack1 >> (2 * p)) & 3) - 1));
+            }
 #elif defined(DATA_A_IQ2_XXS)
             const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
             const uint buf_idx = col * SHMEM_STRIDE + row * LOAD_VEC_A / 2;

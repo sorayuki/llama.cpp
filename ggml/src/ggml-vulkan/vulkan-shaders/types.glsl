@@ -462,6 +462,32 @@ struct block_iq1_m_packed64 {
 #define A_TYPE_PACKED32 block_iq1_m_packed32
 #endif
 
+#define QUANT_K_STQ1_0 256
+#define QUANT_R_STQ1_0 1
+
+struct block_stq1_0 {
+    uint8_t  qs[QUANT_K_STQ1_0/8];
+    uint8_t  sign[QUANT_K_STQ1_0/32];
+    float16_t d;
+};
+
+#if defined(DATA_A_STQ1_0)
+#define QUANT_K QUANT_K_STQ1_0
+#define QUANT_R QUANT_R_STQ1_0
+#define A_TYPE block_stq1_0
+#endif
+
+#if defined(DATA_A_STQ1_0)
+// STQ1_0 codebook: index = (sign << 4) | slot -> packed 4-lane ternary pattern.
+// Per-lane encoding (2 bits): -1 -> 0b00, 0 -> 0b01, +1 -> 0b10.
+const uint stq1_0_codebook[32] = uint[](
+    0xA9u, 0x89u, 0x29u, 0x09u, 0xA6u, 0x86u, 0x26u, 0x06u,
+    0x9Au, 0x92u, 0x1Au, 0x12u, 0x6Au, 0x62u, 0x4Au, 0x42u,
+    0x01u, 0x21u, 0x81u, 0xA1u, 0x04u, 0x24u, 0x84u, 0xA4u,
+    0x10u, 0x18u, 0x90u, 0x98u, 0x40u, 0x48u, 0x60u, 0x68u
+);
+#endif
+
 #if defined(DATA_A_IQ1_S) || defined(DATA_A_IQ1_M)
 #define IQ1S_DELTA 0.125f
 #define IQ1M_DELTA 0.125f
