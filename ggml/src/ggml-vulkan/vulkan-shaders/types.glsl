@@ -471,10 +471,17 @@ struct block_stq1_0 {
     float16_t d;
 };
 
+struct block_stq1_0_packed16 {
+    uint16_t qs[QUANT_K_STQ1_0/16];
+    uint16_t sign[QUANT_K_STQ1_0/64];
+    float16_t d;
+};
+
 #if defined(DATA_A_STQ1_0)
 #define QUANT_K QUANT_K_STQ1_0
 #define QUANT_R QUANT_R_STQ1_0
 #define A_TYPE block_stq1_0
+#define A_TYPE_PACKED16 block_stq1_0_packed16
 #endif
 
 #if defined(DATA_A_STQ1_0)

@@ -528,11 +528,13 @@ FLOAT_TYPE mmvq_dot_product(const uint ib_a, const uint iqs) {
 
 #if defined(DATA_A_STQ1_0)
 int32_t stq1_0_pack_4(const uint ib, const uint g, const uint p) {
+    const uint qs = uint(data_a_packed16[ib].qs[g/4]);
+    const uint signs = uint(data_a_packed16[ib].sign[g/16]);
     int32_t v = 0;
     for (int i = 0; i < 4; ++i) {
         const uint gg = g + i;
-        const uint code = uint((data_a[ib].qs[gg/2] >> (4 * (gg & 1))) & 0x0Fu);
-        const uint sgn = uint((data_a[ib].sign[gg/8] >> (gg % 8)) & 0x01u);
+        const uint code = (qs >> (4 * i)) & 0x0Fu;
+        const uint sgn = (signs >> (gg & 15)) & 0x01u;
         const uint qpack = stq1_0_codebook[(sgn << 4) | code];
         const int32_t q = int32_t(int(qpack >> (2 * p)) & 3) - 1;
         v |= (q & 0xFF) << (8 * i);
